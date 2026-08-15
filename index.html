@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ShaamKiChai</title>
+<style>
+  @import url('https://fonts.cdnfonts.com/css/samarkan');
+  @font-face {
+    font-family: 'InterLocal';
+    src: local('Inter');
+  }
+
+  :root{
+    --glass-bg: rgba(20, 12, 14, 0.28);
+    --glass-border: rgba(255, 235, 220, 0.16);
+    --glass-highlight: rgba(255, 255, 255, 0.06);
+    --ink: #f6ece2;
+    --ink-dim: rgba(246, 236, 226, 0.62);
+    --accent: #ff9a5a;
+    --track-fill: linear-gradient(90deg, #ffb27a, #ff7a5c);
+    --shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin:0;
+    padding:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  body{
+    position:relative;
+    color: var(--ink);
+    background: #0a0708;
+  }
+
+  /* ---------- slider mechanics ---------- */
+  .slides-viewport{
+    position:absolute;
+    inset:0;
+    overflow:hidden;
+  }
+
+  .slides-track{
+    display:flex;
+    width:200%;
+    height:100%;
+    transition: transform 0.7s cubic-bezier(.65,.05,.24,1);
+    transform: translateX(0%);
+  }
+
+  /* ---------- glassmorphic transition overlay ---------- */
+  .transition-glass{
+    position:absolute;
+    inset:0;
+    z-index: 12;
+    background: rgba(255, 245, 235, 0.05);
+    border-radius: 0;
+    backdrop-filter: blur(0px) saturate(100%);
+    -webkit-backdrop-filter: blur(0px) saturate(100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease, backdrop-filter 0.4s ease, -webkit-backdrop-filter 0.4s ease;
+  }
+  .transition-glass::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background: linear-gradient(120deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 40%, rgba(255,255,255,0.10) 100%);
+    mix-blend-mode: overlay;
+  }
+  .transition-glass.active{
+    opacity: 1;
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+  }
+
+  .page{
+    position:relative;
+    width:50%;
+    height:100%;
+    flex-shrink:0;
+    background-size: cover;
+    background-repeat: no-repeat;
+  }
+
+  .page-evening{
+    background-image: url('evening.png');
+    background-position: center 42%;
+  }
+
+  .page-night{
+    background-image: url('night.png');
+    background-position: center 40%;
+  }
+
+  /* subtle vignette so glass panels read clearly without killing the art */
+  .page::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background: radial-gradient(120% 90% at 50% 100%, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0) 60%),
+                linear-gradient(rgba(0,0,0,0.05), rgba(0,0,0,0.12));
+    pointer-events:none;
+  }
+
+  /* ---------- clock, top left ---------- */
+  .clock{
+    position:absolute;
+    top: 22px;
+    left: 26px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    text-shadow: 0 1px 6px rgba(0,0,0,0.45);
+    z-index: 15;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* player angle*/
+  :root{
+    --wall-tilt: -10deg;
+    --wall-lean: -2deg;
+  }
+
+  .now-playing{
+    position:absolute;
+    left: 17%;
+    bottom: 33%;
+    z-index: 5;
+    max-width: 20%;
+    transform-origin: left center;
+    transform: perspective(700px) rotateY(var(--wall-tilt)) rotate(var(--wall-lean));
+  }
+
+  .now-playing .label{
+    font-family: 'Samarkan', cursive;
+    font-size: 28px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin: 0 0 4px 0;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+  }
+
+  .now-playing .track{
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink);
+    margin: 0 0 2px 0;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+    letter-spacing: 0.01em;
+  }
+
+  .now-playing .artist{
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--ink-dim);
+    margin: 0;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+  }
+  /* 2nd page */
+  .page-night .now-playing{
+    left: 8%;
+    bottom: 27%;
+    max-width: 26%;
+    transform: perspective(700px) rotateY(-6deg) rotate(-1.5deg);
+  }
+  .page-night .now-playing .label{
+    font-size: 22px;
+  }
+  .page-night .now-playing .track{
+    font-size: 12px;
+  }
+  .page-night .now-playing .artist{
+    font-size: 10.5px;
+  }
+
+  /* ---------- player, bottom center ---------- */
+  .player{
+    position:absolute;
+    left:50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    width: min(210px, 60vw);
+    padding: 7px 10px 8px;
+    border-radius: 12px;
+    background: rgba(20, 12, 14, 0.12);
+    border: 1px solid rgba(255, 235, 220, 0.10);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.04);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    z-index: 5;
+  }
+
+  /* seek row */
+  .seek-row{
+    display:flex;
+    align-items:center;
+    gap: 4px;
+    margin-bottom: 5px;
+  }
+
+  .time{
+    font-size: 7px;
+    color: var(--ink-dim);
+    min-width: 15px;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  .time.right{ text-align:right; }
+
+  .seek{
+    -webkit-appearance:none;
+    appearance:none;
+    flex:1;
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.18);
+    outline:none;
+    cursor:pointer;
+    position:relative;
+  }
+  .seek::-webkit-slider-runnable-track{
+    height:2px;
+    border-radius:2px;
+    background: linear-gradient(90deg, #ffcf9e 0%, #ff8a63 var(--progress,32%), rgba(255,255,255,0.18) var(--progress,32%));
+  }
+  .seek::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    appearance:none;
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    margin-top: -2px;
+    cursor:pointer;
+    border: none;
+  }
+  .seek::-moz-range-track{
+    height:2px;
+    border-radius:2px;
+    background: rgba(255,255,255,0.18);
+  }
+  .seek::-moz-range-progress{
+    height:2px;
+    border-radius:2px;
+    background: linear-gradient(90deg, #ffcf9e, #ff8a63);
+  }
+  .seek::-moz-range-thumb{
+    width:6px;
+    height:6px;
+    border:none;
+    border-radius:50%;
+    background:#fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    cursor:pointer;
+  }
+
+  /* controls row */
+  .controls-row{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap: 9px;
+  }
+
+  .ctrl-btn{
+    background:none;
+    border:none;
+    padding:0;
+    margin:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    color: var(--ink);
+    opacity: 0.88;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .ctrl-btn:hover{ opacity:1; transform: scale(1.06); }
+  .ctrl-btn:active{ transform: scale(0.94); }
+  .ctrl-btn svg{ display:block; }
+
+  .ctrl-btn:not(.play-btn) svg{
+    width: 18px;
+    height: 18px;
+  }
+
+  .ctrl-btn.active{
+    color: var(--accent);
+    opacity: 1;
+  }
+
+  .play-btn{
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.55);
+    color: #241512;
+    opacity:1;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  }
+  .play-btn:hover{ transform: scale(1.05); }
+  .play-btn svg{
+    width: 10px;
+    height: 10px;
+  }
+
+  /* volume, tucked to the right of controls */
+  .volume-row{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    margin-top: 6px;
+    padding: 0 1px;
+  }
+
+  .volume{
+    -webkit-appearance:none;
+    appearance:none;
+    width: 100%;
+    height: 2px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.18);
+    outline:none;
+    cursor:pointer;
+  }
+  .volume::-webkit-slider-runnable-track{
+    height:2px;
+    border-radius:2px;
+    background: linear-gradient(90deg, #f2ece4 0%, #f2ece4 var(--vol,70%), rgba(255,255,255,0.18) var(--vol,70%));
+  }
+  .volume::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    appearance:none;
+    width:5px;
+    height:5px;
+    border-radius:50%;
+    background:#fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    margin-top: -1.5px;
+    cursor:pointer;
+    border: none;
+  }
+  .volume::-moz-range-track{
+    height:2px; border-radius:2px; background: rgba(255,255,255,0.18);
+  }
+  .volume::-moz-range-progress{
+    height:2px; border-radius:2px; background:#f2ece4;
+  }
+  .volume::-moz-range-thumb{
+    width:5px;height:5px;border:none;border-radius:50%;background:#fff;cursor:pointer;
+  }
+
+  .vol-icon{ color: var(--ink-dim); flex-shrink:0; opacity:0.85; }
+  .vol-icon svg, .vol-icon{ width:7px; height:7px; }
+
+  /* ---------- right-side slide button ---------- */
+  .slide-nav{
+    position:absolute;
+    top:50%;
+    right: 20px;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: rgba(20, 12, 14, 0.30);
+    border: 1px solid rgba(255, 235, 220, 0.18);
+    box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    color: var(--ink);
+    cursor:pointer;
+    z-index: 15;
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  .slide-nav:hover{ transform: translateY(-50%) scale(1.06); background: rgba(20, 12, 14, 0.45); }
+  .slide-nav:active{ transform: translateY(-50%) scale(0.95); }
+  .slide-nav svg{
+    width: 18px;
+    height: 18px;
+    transition: transform 0.4s ease;
+  }
+  .slide-nav.flipped svg{ transform: rotate(180deg); }
+
+  /* ---------- hover tooltip on the slide-nav arrow ---------- */
+  .slide-nav-tooltip{
+    position:absolute;
+    top:50%;
+    right: 68px;
+    transform: translateY(-50%) translateX(6px);
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(20, 12, 14, 0.30);
+    border: 1px solid rgba(255, 235, 220, 0.18);
+    box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    color: var(--ink);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.5);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 15;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .slide-nav:hover ~ .slide-nav-tooltip,
+  .slide-nav:focus-visible ~ .slide-nav-tooltip{
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  @media (max-width: 480px){
+    .slide-nav-tooltip{ right: 56px; font-size: 11px; padding: 7px 12px; }
+  }
+
+  .slide-dots{
+    position:absolute;
+    right: 20px;
+    top: calc(50% + 32px);
+    display:flex;
+    flex-direction:column;
+    gap: 6px;
+    z-index: 15;
+  }
+  .slide-dots .dot{
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.35);
+    transition: background 0.25s ease, transform 0.25s ease;
+  }
+  .slide-dots .dot.active{
+    background: var(--ink);
+    transform: scale(1.2);
+  }
+
+  @media (max-width: 480px){
+    .now-playing{ max-width: 55%; }
+    .slide-nav{ right: 12px; width:34px; height:34px; }
+    .slide-nav svg{ width:15px; height:15px; }
+    .slide-dots{ right: 12px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="clock" id="clock">6:24 PM</div>
+
+  <div id="startOverlay" style="position:absolute; inset:0; z-index:20; display:flex; align-items:center; justify-content:center; cursor:pointer; background:rgba(0,0,0,0.18); backdrop-filter: blur(2px);">
+    <div style="padding:10px 18px; border-radius:999px; background:rgba(20,12,14,0.35); border:1px solid rgba(255,235,220,0.18); backdrop-filter: blur(16px); color:#f6ece2; font-size:12px; letter-spacing:0.04em;">
+      Tap to start playback
+    </div>
+  </div>
+
+  <!-- right-side slide button -->
+  <button class="slide-nav" id="slideNav" aria-label="Switch scene">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+  </button>
+  <div class="slide-nav-tooltip" id="slideNavTooltip">Tap for Qawwalis</div>
+  <div class="slide-dots">
+    <div class="dot active" data-idx="0"></div>
+    <div class="dot" data-idx="1"></div>
+  </div>
+
+  <div class="transition-glass" id="transitionGlass"></div>
+
+  <div class="slides-viewport">
+    <div class="slides-track" id="slidesTrack">
+
+      <!-- ================= PAGE 1 : EVENING ================= -->
+      <div class="page page-evening">
+
+        <div class="now-playing">
+          <p class="label">Now Playing</p>
+          <p class="track" id="trackTitle">Loading…</p>
+          <p class="artist" id="trackArtist">—</p>
+        </div>
+
+        <!-- YouTube player mounts here, shrunk to invisible; audio only -->
+        <div id="yt-player" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;"></div>
+
+        <div class="player">
+          <div class="seek-row">
+            <span class="time left" id="curTime">0:00</span>
+            <input type="range" class="seek" id="seek" min="0" max="100" value="0" style="--progress:0%">
+            <span class="time right" id="durTime">0:00</span>
+          </div>
+
+          <div class="controls-row">
+            <button class="ctrl-btn" id="shuffleBtn" aria-label="Shuffle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.42 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+            </button>
+            <button class="ctrl-btn" id="prevBtn" aria-label="Previous track">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM20 6v12L9 12z"/></svg>
+            </button>
+            <button class="ctrl-btn play-btn" id="playBtn" aria-label="Play">
+              <svg id="playIcon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="ctrl-btn" id="nextBtn" aria-label="Next track">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM4 6v12l11-6z"/></svg>
+            </button>
+          </div>
+
+          <div class="volume-row">
+            <svg class="vol-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            <input type="range" class="volume" id="volume" min="0" max="100" value="70" style="--vol:70%">
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ================= PAGE 2 : NIGHT ================= -->
+      <div class="page page-night">
+
+        <div class="now-playing">
+          <p class="label">Now Playing</p>
+          <p class="track" id="trackTitleNight">Loading…</p>
+          <p class="artist" id="trackArtistNight">—</p>
+        </div>
+
+        <!-- YouTube player mounts here, shrunk to invisible; audio only -->
+        <div id="yt-player-night" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;"></div>
+
+        <div class="player">
+          <div class="seek-row">
+            <span class="time left" id="curTimeNight">0:00</span>
+            <input type="range" class="seek" id="seekNight" min="0" max="100" value="0" style="--progress:0%">
+            <span class="time right" id="durTimeNight">0:00</span>
+          </div>
+
+          <div class="controls-row">
+            <button class="ctrl-btn" id="shuffleBtnNight" aria-label="Shuffle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.42 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+            </button>
+            <button class="ctrl-btn" id="prevBtnNight" aria-label="Previous track">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM20 6v12L9 12z"/></svg>
+            </button>
+            <button class="ctrl-btn play-btn" id="playBtnNight" aria-label="Play">
+              <svg id="playIconNight" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="ctrl-btn" id="nextBtnNight" aria-label="Next track">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM4 6v12l11-6z"/></svg>
+            </button>
+          </div>
+
+          <div class="volume-row">
+            <svg class="vol-icon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+            <input type="range" class="volume" id="volumeNight" min="0" max="100" value="70" style="--vol:70%">
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  // clock — static display per spec, but ticks the real time if left open
+  function pad(n){ return n.toString().padStart(2,'0'); }
+  function updateClock(){
+    const now = new Date();
+    let h = now.getHours();
+    const m = pad(now.getMinutes());
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if(h === 0) h = 12;
+    document.getElementById('clock').textContent = `${h}:${m} ${ampm}`;
+  }
+  updateClock();
+  setInterval(updateClock, 15000);
+
+  // ---- slider (evening <-> night) ----
+  const slidesTrack = document.getElementById('slidesTrack');
+  const slideNav = document.getElementById('slideNav');
+  const slideNavTooltip = document.getElementById('slideNavTooltip');
+  const transitionGlass = document.getElementById('transitionGlass');
+  let glassTimer = null;
+  const dots = document.querySelectorAll('.slide-dots .dot');
+  let currentSlide = 0; // 0 = evening, 1 = night
+
+  function goToSlide(idx){
+    currentSlide = idx;
+
+    // glassmorphic blur sweeps in as the pages slide, then clears once settled
+    transitionGlass.classList.add('active');
+    clearTimeout(glassTimer);
+    glassTimer = setTimeout(() => {
+      transitionGlass.classList.remove('active');
+    }, 380);
+
+    slidesTrack.style.transform = `translateX(-${idx * 50}%)`;
+    slideNav.classList.toggle('flipped', idx === 1);
+    dots.forEach(d => d.classList.toggle('active', Number(d.dataset.idx) === idx));
+    slideNavTooltip.textContent = idx === 1 ? 'Tap for Ghazal' : 'Tap for Qawwalis';
+
+    // pause whichever playlist you're leaving so audio never overlaps
+    if(idx === 1){
+      if(window.ytPlayer && window.ytPlayer.pauseVideo && window.ytPlayer.getPlayerState && window.ytPlayer.getPlayerState() === 1){
+        window.ytPlayer.pauseVideo();
+      }
+    } else {
+      if(window.ytPlayerNight && window.ytPlayerNight.pauseVideo && window.ytPlayerNight.getPlayerState && window.ytPlayerNight.getPlayerState() === 1){
+        window.ytPlayerNight.pauseVideo();
+      }
+    }
+  }
+
+  slideNav.addEventListener('click', () => {
+    goToSlide(currentSlide === 0 ? 1 : 0);
+  });
+  dots.forEach(d => {
+    d.addEventListener('click', () => goToSlide(Number(d.dataset.idx)));
+  });
+
+  // ---- shared UI refs (evening page player) ----
+  const seek = document.getElementById('seek');
+  const volume = document.getElementById('volume');
+  const playBtn = document.getElementById('playBtn');
+  const playIcon = document.getElementById('playIcon');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const shuffleBtn = document.getElementById('shuffleBtn');
+  const curTimeEl = document.getElementById('curTime');
+  const durTimeEl = document.getElementById('durTime');
+  const trackTitleEl = document.getElementById('trackTitle');
+  const trackArtistEl = document.getElementById('trackArtist');
+  const startOverlay = document.getElementById('startOverlay');
+
+  const pauseSVG = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+  const playSVG = '<path d="M8 5v14l11-7z"/>';
+
+  function fmt(s){
+    if(!isFinite(s) || s < 0) s = 0;
+    const m = Math.floor(s/60);
+    const sec = Math.floor(s%60);
+    return `${m}:${pad(sec)}`;
+  }
+
+  // volume slider fill
+  volume.addEventListener('input', () => {
+    volume.style.setProperty('--vol', volume.value + '%');
+    if(window.ytPlayer && window.ytPlayer.setVolume){
+      window.ytPlayer.setVolume(Number(volume.value));
+    }
+  });
+
+  // ---- YouTube IFrame API wiring — evening playlist ----
+  const PLAYLIST_ID = 'RDCLAK5uy_nusa99pjb23HT86uCZf-JW2rjJIGnpp_g';
+  // ---- YouTube Music playlist — night page ----
+  const PLAYLIST_ID_NIGHT = 'OLAK5uy_k3_f9zkGMVvUjkrD-OevsS4z1mBKrg6Q8';
+
+  // load the API script
+  const tag = document.createElement('script');
+  tag.src = "https://www.youtube.com/iframe_api";
+  document.head.appendChild(tag);
+
+  let seeking = false;
+  let progressTimer = null;
+  let seekingNight = false;
+  let progressTimerNight = null;
+
+  let playersReady = 0;
+  window.onYouTubeIframeAPIReady = function(){
+    window.ytPlayer = new YT.Player('yt-player', {
+      height: '1',
+      width: '1',
+      playerVars: {
+        listType: 'playlist',
+        list: PLAYLIST_ID,
+        autoplay: 0,
+        controls: 0,
+        disablekb: 1,
+        playsinline: 1
+      },
+      events: {
+        onReady: onPlayerReady,
+        onStateChange: onPlayerStateChange
+      }
+    });
+
+    window.ytPlayerNight = new YT.Player('yt-player-night', {
+      height: '1',
+      width: '1',
+      playerVars: {
+        listType: 'playlist',
+        list: PLAYLIST_ID_NIGHT,
+        autoplay: 0,
+        controls: 0,
+        disablekb: 1,
+        playsinline: 1
+      },
+      events: {
+        onReady: onPlayerReadyNight,
+        onStateChange: onPlayerStateChangeNight
+      }
+    });
+  };
+
+  function onPlayerReady(e){
+    e.target.setVolume(Number(volume.value));
+    updateTrackInfo();
+  }
+
+  function onPlayerStateChange(e){
+    if(e.data === YT.PlayerState.PLAYING){
+      playIcon.innerHTML = pauseSVG;
+      updateTrackInfo();
+      startProgressLoop();
+    } else if(e.data === YT.PlayerState.PAUSED){
+      playIcon.innerHTML = playSVG;
+      stopProgressLoop();
+    } else if(e.data === YT.PlayerState.CUED){
+      updateTrackInfo();
+    } else if(e.data === YT.PlayerState.ENDED){
+      // playlist auto-advances; if it's the true end, icon reflects paused
+      playIcon.innerHTML = playSVG;
+    }
+  }
+
+  function updateTrackInfo(){
+    try{
+      const data = window.ytPlayer.getVideoData();
+      const title = data && data.title ? data.title : 'Unknown track';
+      const author = data && data.author ? data.author : '';
+      trackTitleEl.textContent = title;
+      trackArtistEl.textContent = author;
+      const dur = window.ytPlayer.getDuration();
+      durTimeEl.textContent = fmt(dur);
+    }catch(err){ /* player not ready yet */ }
+  }
+
+  function startProgressLoop(){
+    stopProgressLoop();
+    progressTimer = setInterval(() => {
+      if(!window.ytPlayer || seeking) return;
+      const cur = window.ytPlayer.getCurrentTime ? window.ytPlayer.getCurrentTime() : 0;
+      const dur = window.ytPlayer.getDuration ? window.ytPlayer.getDuration() : 0;
+      curTimeEl.textContent = fmt(cur);
+      if(dur > 0){
+        durTimeEl.textContent = fmt(dur);
+        const pct = (cur/dur)*100;
+        seek.value = pct;
+        seek.style.setProperty('--progress', pct + '%');
+      }
+    }, 500);
+  }
+  function stopProgressLoop(){
+    if(progressTimer){ clearInterval(progressTimer); progressTimer = null; }
+  }
+
+  // seek bar — scrub on release
+  seek.addEventListener('input', () => {
+    seeking = true;
+    seek.style.setProperty('--progress', seek.value + '%');
+  });
+  seek.addEventListener('change', () => {
+    if(window.ytPlayer && window.ytPlayer.getDuration){
+      const dur = window.ytPlayer.getDuration();
+      const target = (seek.value/100) * dur;
+      window.ytPlayer.seekTo(target, true);
+    }
+    seeking = false;
+  });
+
+  // play / pause
+  playBtn.addEventListener('click', () => {
+    if(!window.ytPlayer) return;
+    const state = window.ytPlayer.getPlayerState();
+    if(state === YT.PlayerState.PLAYING){
+      window.ytPlayer.pauseVideo();
+    } else {
+      window.ytPlayer.playVideo();
+    }
+  });
+
+  // prev / next
+  prevBtn.addEventListener('click', () => {
+    if(window.ytPlayer) window.ytPlayer.previousVideo();
+  });
+  nextBtn.addEventListener('click', () => {
+    if(window.ytPlayer) window.ytPlayer.nextVideo();
+  });
+
+  // shuffle toggle
+  let shuffleOn = false;
+  shuffleBtn.addEventListener('click', () => {
+    shuffleOn = !shuffleOn;
+    shuffleBtn.classList.toggle('active', shuffleOn);
+    if(window.ytPlayer && window.ytPlayer.setShuffle){
+      window.ytPlayer.setShuffle(shuffleOn);
+    }
+  });
+
+  // ---- night page UI refs + wiring (mirrors the evening page) ----
+  const seekNight = document.getElementById('seekNight');
+  const volumeNight = document.getElementById('volumeNight');
+  const playBtnNight = document.getElementById('playBtnNight');
+  const playIconNight = document.getElementById('playIconNight');
+  const prevBtnNight = document.getElementById('prevBtnNight');
+  const nextBtnNight = document.getElementById('nextBtnNight');
+  const shuffleBtnNight = document.getElementById('shuffleBtnNight');
+  const curTimeElNight = document.getElementById('curTimeNight');
+  const durTimeElNight = document.getElementById('durTimeNight');
+  const trackTitleElNight = document.getElementById('trackTitleNight');
+  const trackArtistElNight = document.getElementById('trackArtistNight');
+
+  volumeNight.addEventListener('input', () => {
+    volumeNight.style.setProperty('--vol', volumeNight.value + '%');
+    if(window.ytPlayerNight && window.ytPlayerNight.setVolume){
+      window.ytPlayerNight.setVolume(Number(volumeNight.value));
+    }
+  });
+
+  function onPlayerReadyNight(e){
+    e.target.setVolume(Number(volumeNight.value));
+    updateTrackInfoNight();
+  }
+
+  function onPlayerStateChangeNight(e){
+    if(e.data === YT.PlayerState.PLAYING){
+      playIconNight.innerHTML = pauseSVG;
+      updateTrackInfoNight();
+      startProgressLoopNight();
+    } else if(e.data === YT.PlayerState.PAUSED){
+      playIconNight.innerHTML = playSVG;
+      stopProgressLoopNight();
+    } else if(e.data === YT.PlayerState.CUED){
+      updateTrackInfoNight();
+    } else if(e.data === YT.PlayerState.ENDED){
+      playIconNight.innerHTML = playSVG;
+    }
+  }
+
+  function updateTrackInfoNight(){
+    try{
+      const data = window.ytPlayerNight.getVideoData();
+      const title = data && data.title ? data.title : 'Unknown track';
+      const author = data && data.author ? data.author : '';
+      trackTitleElNight.textContent = title;
+      trackArtistElNight.textContent = author;
+      const dur = window.ytPlayerNight.getDuration();
+      durTimeElNight.textContent = fmt(dur);
+    }catch(err){ /* player not ready yet */ }
+  }
+
+  function startProgressLoopNight(){
+    stopProgressLoopNight();
+    progressTimerNight = setInterval(() => {
+      if(!window.ytPlayerNight || seekingNight) return;
+      const cur = window.ytPlayerNight.getCurrentTime ? window.ytPlayerNight.getCurrentTime() : 0;
+      const dur = window.ytPlayerNight.getDuration ? window.ytPlayerNight.getDuration() : 0;
+      curTimeElNight.textContent = fmt(cur);
+      if(dur > 0){
+        durTimeElNight.textContent = fmt(dur);
+        const pct = (cur/dur)*100;
+        seekNight.value = pct;
+        seekNight.style.setProperty('--progress', pct + '%');
+      }
+    }, 500);
+  }
+  function stopProgressLoopNight(){
+    if(progressTimerNight){ clearInterval(progressTimerNight); progressTimerNight = null; }
+  }
+
+  seekNight.addEventListener('input', () => {
+    seekingNight = true;
+    seekNight.style.setProperty('--progress', seekNight.value + '%');
+  });
+  seekNight.addEventListener('change', () => {
+    if(window.ytPlayerNight && window.ytPlayerNight.getDuration){
+      const dur = window.ytPlayerNight.getDuration();
+      const target = (seekNight.value/100) * dur;
+      window.ytPlayerNight.seekTo(target, true);
+    }
+    seekingNight = false;
+  });
+
+  playBtnNight.addEventListener('click', () => {
+    if(!window.ytPlayerNight) return;
+    const state = window.ytPlayerNight.getPlayerState();
+    if(state === YT.PlayerState.PLAYING){
+      window.ytPlayerNight.pauseVideo();
+    } else {
+      window.ytPlayerNight.playVideo();
+    }
+  });
+
+  prevBtnNight.addEventListener('click', () => {
+    if(window.ytPlayerNight) window.ytPlayerNight.previousVideo();
+  });
+  nextBtnNight.addEventListener('click', () => {
+    if(window.ytPlayerNight) window.ytPlayerNight.nextVideo();
+  });
+
+  let shuffleOnNight = false;
+  shuffleBtnNight.addEventListener('click', () => {
+    shuffleOnNight = !shuffleOnNight;
+    shuffleBtnNight.classList.toggle('active', shuffleOnNight);
+    if(window.ytPlayerNight && window.ytPlayerNight.setShuffle){
+      window.ytPlayerNight.setShuffle(shuffleOnNight);
+    }
+  });
+
+  // first user gesture: required by autoplay policy, starts whichever page is currently showing
+  startOverlay.addEventListener('click', () => {
+    startOverlay.style.display = 'none';
+    const startActivePlayer = () => {
+      const active = currentSlide === 1 ? window.ytPlayerNight : window.ytPlayer;
+      if(active && active.playVideo){
+        active.playVideo();
+        return true;
+      }
+      return false;
+    };
+    if(!startActivePlayer()){
+      // API not ready yet — try again shortly
+      const waitForPlayer = setInterval(() => {
+        if(startActivePlayer()) clearInterval(waitForPlayer);
+      }, 200);
+    }
+  });
+
+  // spacebar toggles play/pause on whichever page is currently active
+  document.addEventListener('keydown', (e) => {
+    if(e.code !== 'Space') return;
+    const tagName = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    if(tagName === 'input' || tagName === 'textarea' || (e.target && e.target.isContentEditable)) return;
+    e.preventDefault();
+
+    // if the intro overlay is still showing, spacebar acts as the first tap
+    if(startOverlay.style.display !== 'none'){
+      startOverlay.click();
+      return;
+    }
+
+    const active = currentSlide === 1 ? window.ytPlayerNight : window.ytPlayer;
+    if(!active) return;
+    const state = active.getPlayerState();
+    if(state === YT.PlayerState.PLAYING){
+      active.pauseVideo();
+    } else {
+      active.playVideo();
+    }
+  });
+</script>
+
+</body>
+</html>
